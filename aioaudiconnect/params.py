@@ -7,6 +7,7 @@ PARAM_API_TIMEOUT = 10
 PARAM_MAX_RESPONSE_ATTEMPTS = 10
 PARAM_REQUEST_STATUS_SLEEP = 10
 PARAM_HTTP_API_BASE_URL = "https://mal-1a.prd.ece.vwg-connect.com/api"
+PARAM_HTTP_API_VW_MESSAGING = "https://msg.volkswagen.de"
 
 PARAM_HTTP_MARKETS_CONFIG = "https://content.app.my.audi.com/service/mobileapp/configurations/markets"
 PARAM_HTTP_MARKETS_DYN_CONFIG = "https://content.app.my.audi.com/service/mobileapp/configurations/market/{c}/{l}?v={v}"

@@ -8,14 +8,10 @@ import re
 import logging
 from time import strftime, gmtime
 from datetime import timedelta, datetime
-
-from .models import (
-    TripDataResponse,
-    CurrentVehicleDataResponse,
-    VehicleDataResponse,
-    VehiclesResponse,
-    Vehicle,
+from aioaudiconnect.models.VehiclesResponse import(
+    VehiclesResponse
 )
+
 from .audi_api import AudiAPI
 from .audi_browserloginresponse import BrowserLoginResponse
 from .util import to_byte_array, get_attr
@@ -49,6 +45,7 @@ from .params import(
     PARAM_OPENID_TOKEN_ENDPOINT,
     PARAM_X_QMAUTH_SECRET,
     PARAM_X_QMAUTH_TOKEN,
+    PARAM_HTTP_API_VW_MESSAGING
 )
 
 SUCCEEDED = "succeeded"
@@ -67,7 +64,7 @@ class AudiService:
         self._spin = spin
         self._homeRegion = {}
         self._homeRegionSetter = {}
-        self.mbbOAuthBaseURL = None
+        self.mbbOAuthBaseURL: str = None
         self.mbboauthToken = None
         self.xclientId = None
         self._tokenEndpoint = ""
@@ -216,11 +213,12 @@ class AudiService:
             return False
 
     ## Define Login functions
-    async def login(self, user: str, password: str):
+    async def login(self, user: str, password: str) -> bool:
         await self.login_request(user, password)
+        return True
 
     async def login_request(self, user: str, password: str):
-        self._api.use_token(None)
+        self._api.set_token(None)
         self._api.set_xclient_id(None)
         self.xclientId = None
 
@@ -239,6 +237,10 @@ class AudiService:
             self._client_id = marketcfg_json["idkClientIDAndroidLive"]
         
         self._authorizationServerBaseURLLive = PARAM_OPENID_AUTHORIZATION_BASEURL
+        if "authorizationServerBaseURLLive" in marketcfg_json:
+            self._authorizationServerBaseURLLive = marketcfg_json["authorizationServerBaseURLLive"]
+        
+        self.mbbOAuthBaseURL = PARAM_OPENID_MBBOAUTH_BASEURL
         if "mbbOAuthBaseURLLive" in marketcfg_json:
             self.mbbOAuthBaseURL = marketcfg_json["mbbOAuthBaseURLLive"]
 
@@ -543,4 +545,150 @@ class AudiService:
             method="GET",
             url=PARAM_HTTP_MARKETS_CONFIG,
             body=None
+        )
+
+    ## Define commands for Audi Connect
+    async def _get_home_region(self, vin: str):
+        if self._homeRegion.get(vin) != None:
+            return self._homeRegion[vin]
+
+        await self._fill_home_region(vin)
+
+        return self._homeRegion[vin]
+
+    async def _fill_home_region(self, vin: str):
+        self._homeRegion[vin] = PARAM_HTTP_API_VW_MESSAGING
+        self._homeRegionSetter[vin] = PARAM_HTTP_API_BASE_URL.split("/api")[0]
+
+        try:
+            self._api.set_token(self.vwToken)
+            res = await self._api.get("{base}/cs/vds/v1/vehicles/{vin}/homeRegion".format(vin=vin,base=PARAM_HTTP_API_BASE_URL))
+            if res != None and res.get("homeRegion") != None and res["homeRegion"].get("baseUri") != None and res["homeRegion"]["baseUri"].get("content") != None:
+                uri = res["homeRegion"]["baseUri"]["content"]
+                if uri != PARAM_HTTP_API_BASE_URL:
+                    self._homeRegionSetter[vin] = uri.split("/api")[0]
+                    self._homeRegion[vin] = self._homeRegionSetter[vin].replace("mal-", "fal-")
+        except Exception:
+            pass
+
+    async def _get_home_region_setter(self, vin: str):
+        if self._homeRegionSetter.get(vin) != None:
+            return self._homeRegionSetter[vin]
+
+        await self._fill_home_region(vin)
+
+        return self._homeRegionSetter[vin]
+
+    async def _get_security_token(self, vin: str, action: str):
+        # Challenge
+        headers = {
+            "User-Agent": PARAM_HDR_USER_AGENT,
+            "X-App-Version": PARAM_HDR_XAPP_VERSION,
+            "X-App-Name": "myAudi",
+            "Accept": "application/json",
+            "Authorization": "Bearer " + self.vwToken.get("access_token"),
+        }
+
+        body = await self._api.send_request(
+            method="GET",
+            url=f"{await self._get_home_region_setter(vin.upper())}/api/rolesrights/authorization/v2/vehicles/{vin.upper()}/services/{action}/security-pin-auth-requested",
+            body=None,
+            headers=headers,
+        )
+        secToken = body["securityPinAuthInfo"]["securityToken"]
+        challenge = body["securityPinAuthInfo"]["securityPinTransmission"]["challenge"]
+
+        # Response
+        securityPinHash = self._generate_security_pin_hash(challenge)
+        data = {
+            "securityPinAuthentication": {
+                "securityPin": {
+                    "challenge": challenge,
+                    "securityPinHash": securityPinHash,
+                },
+                "securityToken": secToken,
+            }
+        }
+
+        headers = {
+            "User-Agent": PARAM_HDR_USER_AGENT,
+            "X-App-Version": PARAM_HDR_XAPP_VERSION,
+            "Content-Type": "application/json",
+            "X-App-Name": "myAudi",
+            "Accept": "application/json",
+            "Authorization": "Bearer " + self.vwToken.get("access_token"),
+        }
+
+        body = await self._api.send_request(
+            method="POST",
+            url=f"{await self._get_home_region_setter(vin.upper())}/api/rolesrights/authorization/v2/security-pin-auth-completed",
+            headers=headers,
+            body=json.dumps(data),
+        )
+        return body["securityToken"]
+
+    def _get_vehicle_action_header(self, content_type: str, security_token: str):
+        headers = {
+            "User-Agent": PARAM_HDR_USER_AGENT,
+            "Host": "msg.volkswagen.de",
+            "X-App-Version": PARAM_HDR_XAPP_VERSION,
+            "X-App-Name": "myAudi",
+            "Authorization": "Bearer " + self.vwToken.get("access_token"),
+            "Accept-charset": "UTF-8",
+            "Content-Type": content_type,
+            "Accept": "application/json, application/vnd.vwg.mbb.ChargerAction_v1_0_0+xml,application/vnd.volkswagenag.com-error-v1+xml,application/vnd.vwg.mbb.genericError_v1_0_2+xml, application/vnd.vwg.mbb.RemoteStandheizung_v2_0_0+xml, application/vnd.vwg.mbb.genericError_v1_0_2+xml,application/vnd.vwg.mbb.RemoteLockUnlock_v1_0_0+xml,*/*",
+        }
+
+        if security_token != None:
+            headers["x-mbbSecToken"] = security_token
+
+        return headers
+
+    async def get_vehicles(self):
+        self._api.set_token(self.vwToken)
+        return await self._api.get(
+            "https://msg.volkswagen.de/fs-car/usermanagement/users/v1/{type}/{country}/vehicles".format(
+                type=self._type, country=self._country
+            )
+        )
+
+    async def get_vehicle_information(self):
+        headers = {
+            "Accept": "application/json",
+            "Accept-Charset": "utf-8",
+            "X-App-Name": "myAudi",
+            "X-App-Version": PARAM_HDR_XAPP_VERSION,
+            "Accept-Language": "{l}-{c}".format(
+                l=self._language, c=self._country.upper()
+            ),
+            "X-User-Country": self._country.upper(),
+            "User-Agent": PARAM_HDR_USER_AGENT,
+            "Authorization": "Bearer " + self.audiToken["access_token"],
+            "Content-Type": "application/json; charset=utf-8",
+        }
+        req_data = {
+            "query": "query vehicleList {\n userVehicles {\n vin\n mappingVin\n vehicle { core { modelYear\n }\n media { shortName\n longName }\n }\n csid\n commissionNumber\n type\n devicePlatform\n mbbConnect\n userRole {\n role\n }\n vehicle {\n classification {\n driveTrain\n }\n }\n nickname\n }\n}"
+        }
+        req_rsp, rep_rsptxt = await self._api.send_request(
+            method="POST",
+            url="https://app-api.live-my.audi.com/vgql/v1/graphql",
+            body=json.dumps(req_data),
+            headers=headers,
+            allow_redirects=False,
+            rsp_wtxt=True,
+        )
+        vins = json.loads(rep_rsptxt)
+        if "data" not in vins:
+            raise Exception("Invalid json in get_vehicle_information")
+
+        response = VehiclesResponse(vins["data"])
+        return response
+
+    async def get_vehicle_data(self, vin: str):
+        self._api.set_token(self.vwToken)
+        data = await self._api.get(
+            "{homeRegion}/fs-car/vehicleMgmt/vehicledata/v2/{type}/{country}/vehicles/{vin}/".format(
+                homeRegion=await self._get_home_region(vin.upper()),
+                type=self._type, country=self._country, vin=vin.upper()
+            )
         )

@@ -1,5 +1,5 @@
 class Vehicle:
-    def __init__(self):
+    def __init__(self, data):
         self.vin = ""
         self.csid = ""
         self.model = ""
@@ -7,7 +7,6 @@ class Vehicle:
         self.model_family = ""
         self.title = ""
 
-    def parse(self, data):
         self.vin = data.get("vin")
         self.csid = data.get("csid")
         if data.get("vehicle") is not None and data.get("vehicle").get("media") is not None:

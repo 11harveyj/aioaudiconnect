@@ -1,6 +1,6 @@
 import async_timeout
 import json
-import datetime
+from datetime import datetime
 
 from asyncio import TimeoutError, CancelledError
 from aiohttp import ClientSession, ClientResponseError
