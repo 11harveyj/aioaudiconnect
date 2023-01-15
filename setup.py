@@ -25,24 +25,11 @@ setuptools.setup(
     keywords="audi audiconnect car carconnect connect",
     python_requires=">=3.6",
     install_requires=[
-        "json",
         "asyncio",
         "aiohttp",
         "async_timeout",
-        "datetime",
         "bs4",
         "requests",
-        "urllib",
-        "abc",
-        "uuid",
-        "base64",
-        "os",
-        "math",
-        "re",
-        "logging",
-        "time",
-        "haslib",
-        "hmac",
         "typing"
     ]
 )
