@@ -47,6 +47,8 @@ from .params import(
     PARAM_OPENID_AUTHORIZATION_ENDPOINT,
     PARAM_OPENID_REVOCATION_ENDPOINT,
     PARAM_OPENID_TOKEN_ENDPOINT,
+    PARAM_X_QMAUTH_SECRET,
+    PARAM_X_QMAUTH_TOKEN,
 )
 
 SUCCEEDED = "succeeded"
@@ -129,15 +131,14 @@ class AudiService:
         gmtime_100sec = int(
             (datetime.utcnow() - datetime(1970, 1, 1)).total_seconds() / 100
         )
-        xqmauth_secret = bytes([26,256-74,256-103,37,256-84,23,256-102,256-86,78,256-125,256-85,256-26,113,256-87,71,109,23,100,24,256-72,91,256-41,6,256-15,67,108,256-95,91,256-26,71,256-104,256-100])
         xqmauth_val = hmac.new(
-            xqmauth_secret,
+            PARAM_X_QMAUTH_SECRET,
             str(gmtime_100sec).encode("ascii", "ignore"),
             digestmod="sha256",
         ).hexdigest()
 
         #v1:01da27b0:fbdb6e4ba3109bc68040cb83f380796f4d3bb178a626c4cc7e166815b806e4b5
-        return "v1:01da27b0:" + xqmauth_val
+        return PARAM_X_QMAUTH_TOKEN.format(h=xqmauth_val)
 
     ## Define Refresh functions, returns True when refresh was required and successful
     async def refresh_token(self, elapsed_sec: int) -> bool:
