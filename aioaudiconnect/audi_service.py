@@ -532,7 +532,7 @@ class AudiService:
 
     async def get_openid_config(self):
         url = PARAM_OPENID_CONFIG.format(
-            "na" if self._country.upper() is "US" else "emea"
+            "na" if self._country.upper() == "US" else "emea"
         )
 
         return await self._api.send_request(method="GET", url=url, body=None)
