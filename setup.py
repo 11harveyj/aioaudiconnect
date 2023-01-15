@@ -23,7 +23,26 @@ setuptools.setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     keywords="audi audiconnect car carconnect connect",
-    entry_points={
-    },
     python_requires=">=3.6",
+    install_requires=[
+        "json",
+        "asyncio",
+        "aiohttp",
+        "async_timeout",
+        "datetime",
+        "bs4",
+        "requests",
+        "urllib",
+        "abc",
+        "uuid",
+        "base64",
+        "os",
+        "math",
+        "re",
+        "logging",
+        "time",
+        "haslib",
+        "hmac",
+        "typing"
+    ]
 )
