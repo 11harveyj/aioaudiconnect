@@ -3,6 +3,7 @@
 import sys
 import asyncio
 import getopt
+import json
 
 from aioaudiconnect.audi_connectaccount import AudiConnectAccount
 
@@ -44,8 +45,10 @@ async def main(argv):
 
         await account.update(None)
 
-        for vehicle in account._vehicles:
-            print(vehicle)
+
+        for property, value in vars(account).items():
+            print(property, ":", value)
+            
 
 if __name__ == "__main__":
     task = main(sys.argv[1:])

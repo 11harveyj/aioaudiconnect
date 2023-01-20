@@ -69,10 +69,10 @@ class AudiAPI:
         self, url, raw_reply: bool = False, raw_contents: bool = False, **kwargs
     ):
         full_headers = self._get_headers()
-        r = await self.request(
+        r = await self.send_request(
             METH_GET,
             url,
-            data=None,
+            body=None,
             headers=full_headers,
             raw_reply=raw_reply,
             raw_contents=raw_contents,
@@ -84,7 +84,7 @@ class AudiAPI:
         full_headers = self._get_headers()
         if headers is not None:
             full_headers.update(headers)
-        r = await self.request(METH_PUT, url, headers=full_headers, data=data)
+        r = await self.send_request(METH_PUT, url, headers=full_headers, body=data)
         return r
 
     async def post(
@@ -102,11 +102,11 @@ class AudiAPI:
             full_headers.update(headers)
         if use_json and data is not None:
             data = json.dumps(data)
-        r = await self.request(
+        r = await self.send_request(
             METH_POST,
             url,
             headers=full_headers,
-            data=data,
+            body=data,
             raw_reply=raw_reply,
             raw_contents=raw_contents,
             **kwargs
@@ -122,7 +122,7 @@ class AudiAPI:
             "User-Agent": PARAM_HDR_USER_AGENT,
         }
         if self._token != None:
-            data["Authorization"] = "Bearer " + self._token
+            data["Authorization"] = "Bearer " + self._token["access_token"]
         if self._xclientid != None:
             data["X-Client-ID"] = self._xclientid
 

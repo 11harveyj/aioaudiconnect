@@ -12,6 +12,13 @@ from aioaudiconnect.params import(
     PARAM_MAX_RESPONSE_ATTEMPTS,
     PARAM_REQUEST_STATUS_SLEEP,
 )
+from aioaudiconnect.const import (
+    ACTION_CHARGER,
+    ACTION_CLIMATISATION,
+    ACTION_LOCK,
+    ACTION_PRE_HEATER,
+    ACTION_WINDOW_HEATING
+)
 from aioaudiconnect.models.AudiConnectVehicle import (
     AudiConnectVehicle
 )
@@ -162,3 +169,174 @@ class AudiConnectAccount:
             return False
 
     
+    async def set_vehicle_lock(self, vin: str, lock: bool):
+        if not self._loggedin:
+            await self.login()
+
+        if not self._loggedin:
+            return False
+
+        try:
+            _LOGGER.debug(
+                "Sending command to {action} to vehicle {vin}".format(
+                    action="lock" if lock else "unlock", vin=vin
+                ),
+            )
+
+            await self._audi_service.set_vehicle_lock(vin, lock)
+
+            _LOGGER.debug(
+                "Successfully {action} vehicle {vin}".format(
+                    action="locked" if lock else "unlocked", vin=vin
+                ),
+            )
+
+            await self.notify(vin, ACTION_LOCK)
+
+            return True
+
+        except Exception as exception:
+            log_exception(
+                exception,
+                "Unable to {action} {vin}".format(
+                    action="lock" if lock else "unlock", vin=vin
+                ),
+            )
+
+    async def set_vehicle_climatisation(self, vin: str, activate: bool):
+        if not self._loggedin:
+            await self.login()
+
+        if not self._loggedin:
+            return False
+
+        try:
+            _LOGGER.debug(
+                "Sending command to {action} climatisation to vehicle {vin}".format(
+                    action="start" if activate else "stop", vin=vin
+                ),
+            )
+
+            await self._audi_service.set_climatisation(vin, activate)
+
+            _LOGGER.debug(
+                "Successfully {action} climatisation of vehicle {vin}".format(
+                    action="started" if activate else "stopped", vin=vin
+                ),
+            )
+
+            await self.notify(vin, ACTION_CLIMATISATION)
+
+            return True
+
+        except Exception as exception:
+            log_exception(
+                exception,
+                "Unable to {action} climatisation of vehicle {vin}".format(
+                    action="start" if activate else "stop", vin=vin
+                ),
+            )
+
+    async def set_battery_charger(self, vin: str, activate: bool, timer: bool):
+        if not self._loggedin:
+            await self.login()
+
+        if not self._loggedin:
+            return False
+
+        try:
+            _LOGGER.debug(
+                "Sending command to {action}{timer} charger to vehicle {vin}".format(
+                    action="start" if activate else "stop", vin=vin,
+                    timer=" timed" if timer else ""
+                ),
+            )
+
+            await self._audi_service.set_battery_charger(vin, activate, timer)
+
+            _LOGGER.debug(
+                "Successfully {action}{timer} charger of vehicle {vin}".format(
+                    action="started" if activate else "stopped", vin=vin,
+                    timer=" timed" if timer else ""
+                ),
+            )
+
+            await self.notify(vin, ACTION_CHARGER)
+
+            return True
+
+        except Exception as exception:
+            log_exception(
+                exception,
+                "Unable to {action} charger of vehicle {vin}".format(
+                    action="start" if activate else "stop", vin=vin
+                ),
+            )
+
+    async def set_vehicle_window_heating(self, vin: str, activate: bool):
+        if not self._loggedin:
+            await self.login()
+
+        if not self._loggedin:
+            return False
+
+        try:
+            _LOGGER.debug(
+                "Sending command to {action} window heating to vehicle {vin}".format(
+                    action="start" if activate else "stop", vin=vin
+                ),
+            )
+
+            await self._audi_service.set_window_heating(vin, activate)
+
+            _LOGGER.debug(
+                "Successfully {action} window heating of vehicle {vin}".format(
+                    action="started" if activate else "stopped", vin=vin
+                ),
+            )
+
+            await self.notify(vin, ACTION_WINDOW_HEATING)
+
+            return True
+
+        except Exception as exception:
+            log_exception(
+                exception,
+                "Unable to {action} window heating of vehicle {vin}".format(
+                    action="start" if activate else "stop", vin=vin
+                ),
+            )
+
+    async def set_vehicle_pre_heater(self, vin: str, activate: bool):
+        if not self._loggedin:
+            await self.login()
+
+        if not self._loggedin:
+            return False
+
+        try:
+            _LOGGER.debug(
+                "Sending command to {action} pre-heater to vehicle {vin}".format(
+                    action="start" if activate else "stop", vin=vin
+                ),
+            )
+
+            await self._audi_service.set_pre_heater(vin, activate)
+
+            _LOGGER.debug(
+                "Successfully {action} pre-heater of vehicle {vin}".format(
+                    action="started" if activate else "stopped", vin=vin
+                ),
+            )
+
+            await self.notify(vin, ACTION_PRE_HEATER)
+
+            return True
+
+        except Exception as exception:
+            log_exception(
+                exception,
+                "Unable to {action} pre-heater of vehicle {vin}".format(
+                    action="start" if activate else "stop", vin=vin
+                ),
+            )

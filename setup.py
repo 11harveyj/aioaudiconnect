@@ -1,7 +1,7 @@
 """Audi Connect API setup."""
 
 import setuptools
-from aioaudiconnect.audi_connect import VERSION
+from aioaudiconnect.const import VERSION
 
 with open("README.md", "r", encoding="utf8", errors="surrogateescape") as fh:
     long_description = fh.read()

@@ -12,6 +12,18 @@ from aioaudiconnect.models.VehiclesResponse import(
     VehiclesResponse
 )
 
+from aioaudiconnect.models.CurrentVehicleDataResponse import (
+    CurrentVehicleDataResponse
+)
+
+from aioaudiconnect.models.VehicleDataResponse import (
+    VehicleDataResponse
+)
+
+from aioaudiconnect.models.TripDataResponse import (
+    TripDataResponse
+)
+
 from .audi_api import AudiAPI
 from .audi_browserloginresponse import BrowserLoginResponse
 from .util import to_byte_array, get_attr
@@ -28,7 +40,7 @@ from requests import RequestException
 
 from typing import Dict
 
-from .params import(
+from aioaudiconnect.params import(
     PARAM_MAX_RESPONSE_ATTEMPTS,
     PARAM_REQUEST_STATUS_SLEEP,
     PARAM_HTTP_API_BASE_URL,
@@ -48,10 +60,12 @@ from .params import(
     PARAM_HTTP_API_VW_MESSAGING
 )
 
-SUCCEEDED = "succeeded"
-FAILED = "failed"
-REQUEST_SUCCESSFUL = "request_successful"
-REQUEST_FAILED = "request_failed"
+from aioaudiconnect.const import (
+    SUCCEEDED,
+    FAILED,
+    REQUEST_SUCCESSFUL,
+    REQUEST_FAILED
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -170,7 +184,7 @@ class AudiService:
             }
             # IDK token request
             encoded_tokenreq_data = urlencode(tokenreq_data, encoding="utf-8").replace("+","%20")
-            bearer_token_rsp, bearer_token_rsptxt = await self._api.request(
+            bearer_token_rsp, bearer_token_rsptxt = await self._api.send_request(
                "POST",
                self._tokenEndpoint,
                encoded_tokenreq_data,
@@ -195,7 +209,7 @@ class AudiService:
                "stage": "live",
                "config": "myaudi",
             }
-            azs_token_rsp, azs_token_rsptxt = await self._api.request(
+            azs_token_rsp, azs_token_rsptxt = await self._api.send_request(
                "POST",
                self._authorizationServerBaseURLLive + "/token",
                json.dumps(asz_req_data),
@@ -691,4 +705,321 @@ class AudiService:
                 homeRegion=await self._get_home_region(vin.upper()),
                 type=self._type, country=self._country, vin=vin.upper()
             )
+        )
+
+    async def refresh_vehicle_data(self, vin: str):
+        res = await self.request_current_vehicle_data(vin.upper())
+        request_id = res.request_id
+
+        checkUrl = "{homeRegion}/fs-car/bs/vsr/v1/{type}/{country}/vehicles/{vin}/requests/{requestId}/jobstatus".format(
+            homeRegion=await self._get_home_region(vin.upper()),
+            type=self._type,
+            country=self._country,
+            vin=vin.upper(),
+            requestId=request_id,
+        )
+
+        await self.check_request_succeeded(
+            checkUrl,
+            "refresh vehicle data",
+            REQUEST_SUCCESSFUL,
+            REQUEST_FAILED,
+            "requestStatusResponse.status",
+        )
+
+    async def request_current_vehicle_data(self, vin: str):
+        self._api.set_token(self.vwToken)
+        data = await self._api.post(
+            "{homeRegion}/fs-car/bs/vsr/v1/{type}/{country}/vehicles/{vin}/requests".format(
+                homeRegion=await self._get_home_region(vin.upper()),
+                type=self._type, country=self._country, vin=vin.upper()
+            )
+        )
+        return CurrentVehicleDataResponse(data)
+
+    async def get_preheater(self, vin: str):
+        self._api.set_token(self.vwToken)
+        return await self._api.get(
+            "{homeRegion}/fs-car/bs/rs/v1/{type}/{country}/vehicles/{vin}/status".format(
+                homeRegion=await self._get_home_region(vin.upper()),
+                type=self._type, country=self._country, vin=vin.upper()
+            )
+        )
+    
+    async def get_preheater(self, vin: str):
+        self._api.set_token(self.vwToken)
+        return await self._api.get(
+            "{homeRegion}/fs-car/bs/rs/v1/{type}/{country}/vehicles/{vin}/status".format(
+                homeRegion=await self._get_home_region(vin.upper()),
+                type=self._type, country=self._country, vin=vin.upper()
+            )
+        )
+
+    async def get_stored_vehicle_data(self, vin: str):
+        self._api.set_token(self.vwToken)
+        data = await self._api.get(
+            "{homeRegion}/fs-car/bs/vsr/v1/{type}/{country}/vehicles/{vin}/status".format(
+                homeRegion=await self._get_home_region(vin.upper()),
+                type=self._type, country=self._country, vin=vin.upper()
+            )
+        )
+        return VehicleDataResponse(data)
+
+    async def get_charger(self, vin: str):
+        self._api.set_token(self.vwToken)
+        return await self._api.get(
+            "{homeRegion}/fs-car/bs/batterycharge/v1/{type}/{country}/vehicles/{vin}/charger".format(
+                homeRegion=await self._get_home_region(vin.upper()),
+                type=self._type, country=self._country, vin=vin.upper()
+            )
+        )
+
+    async def get_climater(self, vin: str):
+        self._api.set_token(self.vwToken)
+        return await self._api.get(
+            "{homeRegion}/fs-car/bs/climatisation/v1/{type}/{country}/vehicles/{vin}/climater".format(
+                homeRegion=await self._get_home_region(vin.upper()),
+                type=self._type, country=self._country, vin=vin.upper()
+            )
+        )
+
+    async def get_stored_position(self, vin: str):
+        self._api.set_token(self.vwToken)
+        return await self._api.get(
+            "{homeRegion}/fs-car/bs/cf/v1/{type}/{country}/vehicles/{vin}/position".format(
+                homeRegion=await self._get_home_region(vin.upper()),
+                type=self._type, country=self._country, vin=vin.upper()
+            )
+        )
+
+    async def get_operations_list(self, vin: str):
+        self._api.set_token(self.vwToken)
+        return await self._api.get(
+            "https://mal-1a.prd.ece.vwg-connect.com/api/rolesrights/operationlist/v3/vehicles/"
+            + vin.upper()
+        )
+
+    async def get_timer(self, vin: str):
+        self._api.set_token(self.vwToken)
+        return await self._api.get(
+            "{homeRegion}/fs-car/bs/departuretimer/v1/{type}/{country}/vehicles/{vin}/timer".format(
+                homeRegion=await self._get_home_region(vin.upper()),
+                type=self._type, country=self._country, vin=vin.upper()
+            )
+        )
+
+    async def get_tripdata(self, vin: str, kind: str):
+        self._api.set_token(self.vwToken)
+
+        # read tripdata
+        headers = {
+            "Accept": "application/json",
+            "Accept-Charset": "utf-8",
+            "X-App-Name": "myAudi",
+            "X-App-Version": PARAM_HDR_XAPP_VERSION,
+            "X-Client-ID": self.xclientId,
+            "User-Agent": PARAM_HDR_USER_AGENT,
+            "Authorization": "Bearer " + self.vwToken["access_token"],
+        }
+        td_reqdata = {
+            "type": "list",
+            "from": "1970-01-01T00:00:00Z",
+            # "from":(datetime.utcnow() - timedelta(days=365)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "to": (datetime.utcnow() + timedelta(minutes=90)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        data = await self._api.send_request(
+            "GET",
+            "{homeRegion}/api/bs/tripstatistics/v1/vehicles/{vin}/tripdata/{kind}".format(
+                homeRegion=await self._get_home_region_setter(vin.upper()),
+                vin=vin.upper(),
+                kind=kind,
+            ),
+            None,
+            params=td_reqdata,
+            headers=headers,
+        )
+        td_sorted = sorted(
+            data["tripDataList"]["tripData"],
+            key=lambda k: k["overallMileage"],
+            reverse=True,
+        )
+
+        td_current = td_sorted[0]
+        td_reset_trip = None
+
+        for trip in td_sorted:
+            if (td_current["startMileage"] - trip["startMileage"]) > 2:
+                td_reset_trip = trip
+                break
+            else:
+                td_current["tripID"] = trip["tripID"]
+                td_current["startMileage"] = trip["startMileage"]
+
+        return TripDataResponse(td_current), TripDataResponse(td_reset_trip)
+
+    
+    async def set_vehicle_lock(self, vin: str, lock: bool):
+        security_token = await self._get_security_token(
+            vin, "rlu_v1/operations/" + ("LOCK" if lock else "UNLOCK")
+        )
+        data = '<?xml version="1.0" encoding= "UTF-8" ?><rluAction xmlns="http://audi.de/connect/rlu"><action>{action}</action></rluAction>'.format(
+            action="lock" if lock else "unlock"
+        )
+        headers = self._get_vehicle_action_header(
+            "application/vnd.vwg.mbb.RemoteLockUnlock_v1_0_0+xml", security_token
+        )
+        res = await self._api.send_request(
+            "POST",
+            "{homeRegion}/fs-car/bs/rlu/v1/{type}/{country}/vehicles/{vin}/actions".format(
+                homeRegion=await self._get_home_region(vin.upper()),
+                type=self._type, country=self._country, vin=vin.upper()
+            ),
+            headers=headers,
+            data=data,
+        )
+
+        checkUrl = "{homeRegion}/fs-car/bs/rlu/v1/{type}/{country}/vehicles/{vin}/requests/{requestId}/status".format(
+            homeRegion=await self._get_home_region(vin.upper()),
+            type=self._type,
+            country=self._country,
+            vin=vin.upper(),
+            requestId=res["rluActionResponse"]["requestId"],
+        )
+
+        await self.check_request_succeeded(
+            checkUrl,
+            "lock vehicle" if lock else "unlock vehicle",
+            REQUEST_SUCCESSFUL,
+            REQUEST_FAILED,
+            "requestStatusResponse.status",
+        )
+
+    async def set_battery_charger(self, vin: str, start: bool, timer: bool):
+        if start and timer:
+            data = '{ "action": { "type": "selectChargingMode", "settings": { "chargeModeSelection": { "value": "timerBasedCharging" } } }}'
+        elif start:
+            data = '{ "action": { "type": "start" }}'
+        else:
+            data = '{ "action": { "type": "stop" }}'
+
+        headers = self._get_vehicle_action_header(
+            "application/json", None
+        )
+        res = await self._api.send_request(
+            "POST",
+            "{homeRegion}/fs-car/bs/batterycharge/v1/{type}/{country}/vehicles/{vin}/charger/actions".format(
+                homeRegion=await self._get_home_region(vin.upper()),
+                type=self._type, country=self._country, vin=vin.upper()
+            ),
+            headers=headers,
+            data=data,
+        )
+
+        checkUrl = "{homeRegion}/fs-car/bs/batterycharge/v1/{type}/{country}/vehicles/{vin}/charger/actions/{actionid}".format(
+            homeRegion=await self._get_home_region(vin.upper()),
+            type=self._type,
+            country=self._country,
+            vin=vin.upper(),
+            actionid=res["action"]["actionId"],
+        )
+
+        await self.check_request_succeeded(
+            checkUrl,
+            "start charger" if start else "stop charger",
+            SUCCEEDED,
+            FAILED,
+            "action.actionState",
+        )
+
+    async def set_climatisation(self, vin: str, start: bool):
+        if start:
+            data = '{"action":{"type": "startClimatisation","settings": {"targetTemperature": 2940,"climatisationWithoutHVpower": true,"heaterSource": "electric","climaterElementSettings": {"isClimatisationAtUnlock": false, "isMirrorHeatingEnabled": true,}}}}'
+        else:
+            data = '{"action":{"type": "stopClimatisation"}}'
+
+        headers = self._get_vehicle_action_header(
+            'application/json', None
+        )
+        res = await self._api.send_request(
+            "POST",
+            "{homeRegion}/fs-car/bs/climatisation/v1/{type}/{country}/vehicles/{vin}/climater/actions".format(
+                homeRegion=await self._get_home_region(vin.upper()),
+                type=self._type, country=self._country, vin=vin.upper()
+            ),
+            headers=headers,
+            data=data,
+        )
+
+        checkUrl = "{homeRegion}/fs-car/bs/climatisation/v1/{type}/{country}/vehicles/{vin}/climater/actions/{actionid}".format(
+            homeRegion=await self._get_home_region(vin.upper()),
+            type=self._type,
+            country=self._country,
+            vin=vin.upper(),
+            actionid=res["action"]["actionId"],
+        )
+
+        await self.check_request_succeeded(
+            checkUrl,
+            "start climatisation" if start else "stop climatisation",
+            SUCCEEDED,
+            FAILED,
+            "action.actionState",
+        )
+
+    async def set_window_heating(self, vin: str, start: bool):
+        data = '<?xml version="1.0" encoding= "UTF-8" ?><action><type>{action}</type></action>'.format(
+            action="startWindowHeating" if start else "stopWindowHeating"
+        )
+
+        headers = self._get_vehicle_action_header(
+            "application/vnd.vwg.mbb.ClimaterAction_v1_0_0+xml", None
+        )
+        res = await self._api.send_request(
+            "POST",
+            "{homeRegion}/fs-car/bs/climatisation/v1/{type}/{country}/vehicles/{vin}/climater/actions".format(
+                homeRegion=await self._get_home_region(vin.upper()),
+                type=self._type, country=self._country, vin=vin.upper()
+            ),
+            headers=headers,
+            data=data,
+        )
+
+        checkUrl = "{homeRegion}/fs-car/bs/climatisation/v1/{type}/{country}/vehicles/{vin}/climater/actions/{actionid}".format(
+            homeRegion=await self._get_home_region(vin.upper()),
+            type=self._type,
+            country=self._country,
+            vin=vin.upper(),
+            actionid=res["action"]["actionId"],
+        )
+
+        await self.check_request_succeeded(
+            checkUrl,
+            "start window heating" if start else "stop window heating",
+            SUCCEEDED,
+            FAILED,
+            "action.actionState",
+        )
+
+    async def set_pre_heater(self, vin: str, activate: bool):
+        security_token = await self._get_security_token(
+            vin, "rheating_v1/operations/P_QSACT"
+        )
+
+        data = '<?xml version="1.0" encoding= "UTF-8" ?>{input}'.format(
+            input='<performAction xmlns="http://audi.de/connect/rs"><quickstart><active>true</active></quickstart></performAction>'
+            if activate
+            else '<performAction xmlns="http://audi.de/connect/rs"><quickstop><active>false</active></quickstop></performAction>'
+        )
+
+        headers = self._get_vehicle_action_header(
+            "application/vnd.vwg.mbb.RemoteStandheizung_v2_0_0+xml", security_token
+        )
+        await self._api.send_request(
+            "POST",
+            "{homeRegion}/fs-car/bs/rs/v1/{type}/{country}/vehicles/{vin}/action".format(
+                homeRegion=await self._get_home_region(vin.upper()),
+                type=self._type, country=self._country, vin=vin.upper()
+            ),
+            headers=headers,
+            data=data,
         )
